@@ -31,23 +31,6 @@ def get_connection():
         port=3306
     )
 
-# ---------------------------------------------------------
-# 4. サイドバー（画面遷移メニュー）
-# ---------------------------------------------------------
-with st.sidebar:
-    st.title("📌 メニュー")
-
-    if st.button("🏠 HOME", use_container_width=True):
-        st.switch_page("home.py")
-
-    if st.button("📋 議題一覧", use_container_width=True):
-        st.switch_page("app.py")
-
-    if st.button("➕ 議題作成", use_container_width=True):
-        st.switch_page("pages/create_topic.py")
-
-    if st.button("📊 投票結果", use_container_width=True):
-        st.switch_page("pages/results.py")
 
 # ---------------------------------------------------------
 # 5. ヘッダー
@@ -89,3 +72,4 @@ for topic in topics:
 
 cursor.close()
 conn.close()
+
