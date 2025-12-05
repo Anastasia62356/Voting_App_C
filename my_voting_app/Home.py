@@ -1,104 +1,91 @@
+#%%writefile app.py
 import streamlit as st
 import pandas as pd
-import os
+import mysql.connector
 
 # ---------------------------------------------------------
-# 1. 設定 & 定数 (変更しやすいようにここにまとめる)
+# 1. 設定 & 定数
 # ---------------------------------------------------------
-PAGE_TITLE = "投票アプリ Home"
-APP_HEADER = "🗳️ 投票アプリへようこそ！"
-APP_DESCRIPTION = "チームの意見を一つに。新しい議題を作ったり、投票に参加しましょう。"
+PAGE_TITLE = "投票アプリ"
+APP_HEADER = "🗳️ 議題一覧"
+APP_DESCRIPTION = "みんなで意見を集めよう！気になる議題に投票できます。"
 
-# 統計情報のダミーデータ (後でGitHubやデータベースから取得する関数に置き換えます)
-def get_stats():
- # 1. 議題数（topics.csvの行数）を数える
-    topics_count = 0
-    if os.path.exists("data/topics.csv"):
-        df_topics = pd.read_csv("data/topics.csv")
-        topics_count = len(df_topics)
-
-    # 2. 投票数（votes.csvの行数）を数える ※まだファイルがない場合は0
-    votes_count = 0
-    if os.path.exists("data/votes.csv"):
-        df_votes = pd.read_csv("data/votes.csv")
-        votes_count = len(df_votes)
-
-    return {
-        "participants": topics_count, # ここを「現在の議題数」として表示してみましょう
-        "votes": votes_count
-    }
 # ---------------------------------------------------------
 # 2. ページ設定
 # ---------------------------------------------------------
 st.set_page_config(
     page_title=PAGE_TITLE,
     page_icon="🗳️",
-    layout="centered" # スマホでも見やすいよう中央寄せ
+    layout="centered"
 )
 
 # ---------------------------------------------------------
-# 3. カスタムCSS (見た目の微調整)
+# 3. DB接続関数（RDS）
 # ---------------------------------------------------------
-st.markdown("""
-    <style>
-    /* 全体の余白調整 */
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-    }
-    /* 統計情報の文字スタイル */
-    .stat-text {
-        font-size: 0.9rem;
-        color: #666;
-        text-align: center;
-        margin-top: 10px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+def get_connection():
+    return mysql.connector.connect(
+        host=st.secrets["DB_HOST"],
+        user=st.secrets["DB_USER"],
+        password=st.secrets["DB_PASS"],
+        database=st.secrets["DB_NAME"],
+        port=3306
+    )
 
 # ---------------------------------------------------------
-# 4. メインUI構築
+# 4. サイドバー（画面遷移メニュー）
 # ---------------------------------------------------------
-def main():
-    stats = get_stats()
+with st.sidebar:
+    st.title("📌 メニュー")
 
-    # 外枠のコンテナを作成（クオリティアップのための枠線）
+    if st.button("🏠 HOME", use_container_width=True):
+        st.switch_page("home.py")
+
+    if st.button("📋 議題一覧", use_container_width=True):
+        st.switch_page("app.py")
+
+    if st.button("➕ 議題作成", use_container_width=True):
+        st.switch_page("pages/create_topic.py")
+
+    if st.button("📊 投票結果", use_container_width=True):
+        st.switch_page("pages/results.py")
+
+# ---------------------------------------------------------
+# 5. ヘッダー
+# ---------------------------------------------------------
+st.title(APP_HEADER)
+st.caption(APP_DESCRIPTION)
+st.divider()
+
+# ---------------------------------------------------------
+# 6. 議題取得（DBから）
+# ---------------------------------------------------------
+conn = get_connection()
+cursor = conn.cursor(dictionary=True)
+
+cursor.execute("SELECT * FROM topics")
+topics = cursor.fetchall()
+
+# ---------------------------------------------------------
+# 7. 議題表示（カード風・DB連動）
+# ---------------------------------------------------------
+for topic in topics:
     with st.container(border=True):
-        
-        # --- ヘッダー ---
-        st.title(APP_HEADER)
-        st.markdown(APP_DESCRIPTION)
-        st.divider() # 区切り線
+        st.subheader(topic["title"])
 
-        # --- ナビゲーションメニュー ---
-        # st.page_link は従来のボタンよりモダンで、ページ遷移に特化しています
-        # ※ pagesフォルダに実際のファイルがないとエラーになるため、
-        #    ファイルが存在しない場合は disabled=True にする処理を入れるのが親切です。
-        
-        st.subheader("メニュー")
-        
-        col1, col2, col3 = st.columns([1, 4, 1]) # 中央寄せのためのカラム調整
+        col1, col2 = st.columns([1, 2])
+
+        with col1:
+            if st.button("👍 投票する", key=f"vote_{topic['id']}"):
+                cursor.execute(
+                    "UPDATE topics SET votes = votes + 1 WHERE id = %s",
+                    (topic["id"],)
+                )
+                conn.commit()
+                st.success("投票しました！")
+                st.rerun()  # 即時画面更新
+
         with col2:
-            st.page_link("pages/1_議題一覧.py", label="議題一覧を見る", icon="📋", help="現在進行中の投票に参加します")
-            st.page_link("pages/2_新規作成.py", label="新しい議題を作成する", icon="✨", help="新しい投票トピックを立ち上げます")
-            st.page_link("pages/3_投票結果.py", label="投票結果を見る (最新)", icon="📊", help="集計結果を確認します")
+            st.write(f"現在の投票数：{topic['votes']} 票")
 
-        st.divider() # 区切り線
-
-        # --- フッター（統計情報） ---
-        # カラムを使って中央に配置し、見栄え良くする
-        f_col1, f_col2, f_col3 = st.columns([1, 2, 1])
-        with f_col2:
-            st.markdown(
-                f"""
-                <div class='stat-text'>
-                👥 参加者数: <b>{stats['participants']}</b> 人 / 🗳️ 投票数: <b>{stats['votes']}</b> 票
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-if __name__ == "__main__":
-
-    main()
-
+cursor.close()
+conn.close()
