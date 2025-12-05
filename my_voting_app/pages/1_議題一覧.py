@@ -28,13 +28,13 @@ with st.sidebar:
         st.switch_page("Home.py")
 
     if st.button("📋 議題一覧", use_container_width=True):
-        st.switch_page("1_議題一覧.py.py")
+        st.switch_page("1_議題一覧.py")
 
     if st.button("➕ 議題作成", use_container_width=True):
-        st.switch_page("2_議題一覧.py.py")
+        st.switch_page("2_議題一覧.py")
 
     if st.button("📊 投票結果", use_container_width=True):
-        st.switch_page("3_議題一覧.py.py")
+        st.switch_page("3_議題一覧.py")
 
 # ---------------------------------------------------------
 # 4. ヘッダー
@@ -68,4 +68,5 @@ for topic in topics:
 
         with col2:
             st.write(f"現在の投票数：{topic['votes']} 票")
+
 
