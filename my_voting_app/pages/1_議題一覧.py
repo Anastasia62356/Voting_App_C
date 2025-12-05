@@ -1,6 +1,7 @@
 #%%writefile app.py
 import streamlit as st
 import pandas as pd
+import mysql.connector
 
 # ---------------------------------------------------------
 # 1. 設定 & 定数
@@ -18,25 +19,54 @@ st.set_page_config(
     layout="centered"
 )
 
+# ---------------------------------------------------------
+# 3. DB接続関数（RDS）
+# ---------------------------------------------------------
+def get_connection():
+    return mysql.connector.connect(
+        host=st.secrets["DB_HOST"],
+        user=st.secrets["DB_USER"],
+        password=st.secrets["DB_PASS"],
+        database=st.secrets["DB_NAME"],
+        port=3306
+    )
 
 # ---------------------------------------------------------
-# 4. ヘッダー
+# 4. サイドバー（画面遷移メニュー）
+# ---------------------------------------------------------
+with st.sidebar:
+    st.title("📌 メニュー")
+
+    if st.button("🏠 HOME", use_container_width=True):
+        st.switch_page("home.py")
+
+    if st.button("📋 議題一覧", use_container_width=True):
+        st.switch_page("app.py")
+
+    if st.button("➕ 議題作成", use_container_width=True):
+        st.switch_page("pages/create_topic.py")
+
+    if st.button("📊 投票結果", use_container_width=True):
+        st.switch_page("pages/results.py")
+
+# ---------------------------------------------------------
+# 5. ヘッダー
 # ---------------------------------------------------------
 st.title(APP_HEADER)
 st.caption(APP_DESCRIPTION)
 st.divider()
 
 # ---------------------------------------------------------
-# 5. 議題リスト（仮データ）
+# 6. 議題取得（DBから）
 # ---------------------------------------------------------
-topics = [
-    {"id": 1, "title": "好きなプログラミング言語は？", "votes": 0},
-    {"id": 2, "title": "次回のイベント開催場所は？", "votes": 0},
-    {"id": 3, "title": "欲しい部活動設備は？", "votes": 0},
-]
+conn = get_connection()
+cursor = conn.cursor(dictionary=True)
+
+cursor.execute("SELECT * FROM topics")
+topics = cursor.fetchall()
 
 # ---------------------------------------------------------
-# 6. 議題表示（カード風・純正UI）
+# 7. 議題表示（カード風・DB連動）
 # ---------------------------------------------------------
 for topic in topics:
     with st.container(border=True):
@@ -46,13 +76,16 @@ for topic in topics:
 
         with col1:
             if st.button("👍 投票する", key=f"vote_{topic['id']}"):
-                topic["votes"] += 1
+                cursor.execute(
+                    "UPDATE topics SET votes = votes + 1 WHERE id = %s",
+                    (topic["id"],)
+                )
+                conn.commit()
                 st.success("投票しました！")
+                st.rerun()  # 即時画面更新
 
         with col2:
             st.write(f"現在の投票数：{topic['votes']} 票")
 
-
-
-
-
+cursor.close()
+conn.close()
